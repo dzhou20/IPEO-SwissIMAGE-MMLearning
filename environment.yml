@@ -1,0 +1,27 @@
+name: ipeo-env
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.13
+  - pip
+  - pytorch
+  - torchvision
+  - torchaudio
+  - numpy
+  - pandas
+  - scikit-learn
+  - rasterio
+  - geopandas
+  - shapely
+  - fiona
+  - pyproj
+  - gdal
+  - matplotlib
+  - seaborn
+  - jupyter
+  - ipykernel
+  - tqdm
+  - pip:
+      - timm
+      - albumentations
