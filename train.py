@@ -57,10 +57,15 @@ def main() -> None:
     )
 
     if args.mode == "image":
-        model = ImageOnlyModel(args.backbone, args.pretrained)
+        model = ImageOnlyModel(args.backbone, args.pretrained, image_size=image_size)
     else:
         tabular_dim = len(group_cols)
-        model = EarlyFusionModel(args.backbone, args.pretrained, tabular_dim=tabular_dim)
+        model = EarlyFusionModel(
+            args.backbone,
+            args.pretrained,
+            tabular_dim=tabular_dim,
+            image_size=image_size,
+        )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)

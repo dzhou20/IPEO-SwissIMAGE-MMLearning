@@ -7,7 +7,7 @@ __pycache__/
 .~lock.*
 
 # Data and artifacts
-data/
+/data/
 processed/
 checkpoints/
 outputs/

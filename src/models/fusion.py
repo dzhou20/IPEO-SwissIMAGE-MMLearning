@@ -8,9 +8,15 @@ from src.models.backbone import build_backbone
 
 
 class ImageOnlyModel(nn.Module):
-    def __init__(self, backbone: str, pretrained: bool, num_classes: int = NUM_CLASSES) -> None:
+    def __init__(
+        self,
+        backbone: str,
+        pretrained: bool,
+        image_size: int | tuple[int, int],
+        num_classes: int = NUM_CLASSES,
+    ) -> None:
         super().__init__()
-        self.encoder, feature_dim = build_backbone(backbone, pretrained)
+        self.encoder, feature_dim = build_backbone(backbone, pretrained, image_size)
         self.head = nn.Linear(feature_dim, num_classes)
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
@@ -24,12 +30,13 @@ class EarlyFusionModel(nn.Module):
         backbone: str,
         pretrained: bool,
         tabular_dim: int,
+        image_size: int | tuple[int, int],
         num_classes: int = NUM_CLASSES,
         fusion_hidden: int = 128,
         dropout: float = 0.2,
     ) -> None:
         super().__init__()
-        self.encoder, feature_dim = build_backbone(backbone, pretrained)
+        self.encoder, feature_dim = build_backbone(backbone, pretrained, image_size)
 
         self.tabular_mlp = nn.Sequential(
             nn.Linear(tabular_dim, fusion_hidden),
