@@ -16,7 +16,7 @@ from src.data.dataloaders import build_dataloaders
 from src.models.fusion import ImageOnlyModel, EarlyFusionModel
 from src.train.engine import train_one_epoch, evaluate
 from src.utils.seed import set_seed
-from src.utils.visualize import save_confusion_matrix
+from src.utils.visualize import save_confusion_matrix, save_normalized_confusion_matrix
 
 
 def parse_args() -> argparse.Namespace:
@@ -177,6 +177,13 @@ def main() -> None:
         output_dir=str(run_dir),
         filename_prefix="confusion_matrix",
     )
+    save_normalized_confusion_matrix(
+        y_true,
+        y_pred,
+        labels=labels,
+        output_dir=str(run_dir),
+        filename_prefix="confusion_matrix_normalized",
+    )
 
     per_class_df = pd.DataFrame(
         {"class_id": list(range(NUM_CLASSES)), "class_name": labels, "f1": per_class.numpy()}
@@ -202,6 +209,20 @@ def main() -> None:
         plt.title("Val Accuracy vs Epoch")
         plt.tight_layout()
         plt.savefig(run_dir / "accuracy_vs_epoch.png", dpi=300)
+        plt.close()
+
+    if val_macro_f1s or val_micro_f1s:
+        plt.figure(figsize=(6, 4))
+        if val_macro_f1s:
+            plt.plot(epochs, val_macro_f1s, marker="o", label="macro_f1")
+        if val_micro_f1s:
+            plt.plot(epochs, val_micro_f1s, marker="o", label="micro_f1")
+        plt.xlabel("Epoch")
+        plt.ylabel("F1")
+        plt.title("Val F1 vs Epoch")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(run_dir / "val_f1_vs_epoch.png", dpi=300)
         plt.close()
 
 

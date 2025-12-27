@@ -35,17 +35,12 @@ configs/              # hyperparams and experiment configs (if using Hydra/JSON/
 ```
 
 ## Environment Setup
-- Python >= 3.10 recommended.
-- Core packages: `torch`, `torchvision` or `timm`, `numpy`, `pandas`, `scikit-learn`, `albumentations` or `torchvision.transforms`, `rasterio`, `geopandas`, `matplotlib`, `seaborn`, `tqdm`.
-- Optional: `pytorch-lightning` or `lightning`, `hydra-core`, `wandb`/`tensorboard`.
+- Use the provided Conda environment file: `environment.yml`.
 
 Example setup:
 ```
-python -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu  # or cuda wheel
-pip install timm numpy pandas scikit-learn albumentations rasterio geopandas matplotlib seaborn tqdm
+conda env create -f environment.yml
+conda activate ipeo-env
 ```
 
 ## Recommended Workflow
@@ -83,6 +78,11 @@ Early fusion with a single SWECO group (example: bioclim):
 python train.py --mode fusion --group bioclim --backbone resnet18
 ```
 
+Early fusion with all SWECO variables (merged and de-duplicated):
+```
+python train.py --mode fusion --group all --backbone resnet18
+```
+
 Switch backbone to ViT:
 ```
 python train.py --mode image --backbone vit
@@ -90,6 +90,7 @@ python train.py --mode image --backbone vit
 
 Notes:
 - `--group` is required in fusion mode. Valid groups are the keys in `sweco_group_of_variables.py`.
+- `--group all` merges all SWECO groups and removes duplicate variable names.
 - Add `--pretrained` to load pretrained weights (requires local cache or network access).
 
 ## Reproducibility Checklist
