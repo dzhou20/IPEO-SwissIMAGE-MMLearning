@@ -70,6 +70,28 @@ pip install timm numpy pandas scikit-learn albumentations rasterio geopandas mat
 7) **Inference & Mapping**:
    - Apply best model on held-out test and on any additional tiles; if producing maps, export GeoTIFF/GeoPackage with predicted class per pixel/location.
 
+## Run The Baselines
+All training runs automatically evaluate on the test set and save the confusion matrix (CSV + PNG) under `outputs/<run_name>/`.
+
+Image-only baseline (ResNet18, 200x200 input):
+```
+python train.py --mode image --backbone resnet18
+```
+
+Early fusion with a single SWECO group (example: bioclim):
+```
+python train.py --mode fusion --group bioclim --backbone resnet18
+```
+
+Switch backbone to ViT:
+```
+python train.py --mode image --backbone vit
+```
+
+Notes:
+- `--group` is required in fusion mode. Valid groups are the keys in `sweco_group_of_variables.py`.
+- Add `--pretrained` to load pretrained weights (requires local cache or network access).
+
 ## Reproducibility Checklist
 - Fix seeds; log versions and hyperparameters.
 - Save best checkpoints and evaluation artifacts (confusion matrices, reliability plots).

@@ -4,11 +4,13 @@ __pycache__/
 .venv/
 .env
 *.log
+.~lock.*
 
 # Data and artifacts
 data/
 processed/
 checkpoints/
+outputs/
 *.tif
 *.pt
 *.pth
