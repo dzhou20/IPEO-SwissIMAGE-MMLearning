@@ -4,10 +4,11 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+import numpy as np
 from torch.utils.data import DataLoader
 from torch.utils.data._utils.collate import default_collate
 
-from config import CSV_PATH, IMAGE_DIR, IMAGE_SIZE
+from config import CSV_PATH, IMAGE_DIR, IMAGE_SIZE, NUM_CLASSES
 from sweco_group_of_variables import sweco_variables_dict
 from src.data.dataset import DatasetConfig, SwissImageDataset
 
@@ -49,6 +50,14 @@ def _resolve_group_columns(df: pd.DataFrame, group: Optional[str]) -> Optional[l
 
     return resolved
 
+def collate_fn(batch):
+        filtered = [item for item in batch if item is not None]
+        if len(filtered) != len(batch):
+            dropped = len(batch) - len(filtered)
+            print(f"[warn] Dropped {dropped} corrupt samples in a batch.")
+        if not filtered:
+            return None
+        return default_collate(filtered)
 
 def build_dataloaders(
     mode: str,
@@ -78,6 +87,14 @@ def build_dataloaders(
     val_df = df[df["split"] == "val"]
     test_df = df[df["split"] == "test"]
 
+    counts = train_df["EUNIS_cls"].value_counts().sort_index()
+    counts_full = np.zeros(NUM_CLASSES)
+    for i, count in counts.items():
+        if i < NUM_CLASSES: counts_full[i] = count
+    
+    weights = 1.0 / (np.sqrt(counts_full) + 1e-6)
+    weights = weights / weights.sum() * NUM_CLASSES
+
     train_cfg = DatasetConfig(
         image_dir=image_dir,
         image_size=image_size,
@@ -96,15 +113,6 @@ def build_dataloaders(
     train_ds = SwissImageDataset(train_df, train_cfg)
     val_ds = SwissImageDataset(val_df, eval_cfg)
     test_ds = SwissImageDataset(test_df, eval_cfg)
-
-    def collate_fn(batch):
-        filtered = [item for item in batch if item is not None]
-        if len(filtered) != len(batch):
-            dropped = len(batch) - len(filtered)
-            print(f"[warn] Dropped {dropped} corrupt samples in a batch.")
-        if not filtered:
-            return None
-        return default_collate(filtered)
 
     train_loader = DataLoader(
         train_ds,
@@ -131,4 +139,4 @@ def build_dataloaders(
         collate_fn=collate_fn,
     )
 
-    return train_loader, val_loader, test_loader, group_cols
+    return train_loader, val_loader, test_loader, group_cols, weights

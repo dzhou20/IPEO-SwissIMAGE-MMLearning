@@ -12,6 +12,7 @@ def train_one_epoch(
     model: torch.nn.Module,
     loader: DataLoader,
     optimizer: torch.optim.Optimizer,
+    criterion: torch.nn.Module,
     device: torch.device,
     mode: str,
 ) -> float:
@@ -38,7 +39,7 @@ def train_one_epoch(
             labels = labels.to(device)
             logits = model(images, tabular)
 
-        loss = torch.nn.functional.cross_entropy(logits, labels)
+        loss = criterion(logits, labels)
         loss.backward()
         optimizer.step()
         
@@ -61,6 +62,7 @@ def train_one_epoch(
 def evaluate(
     model: torch.nn.Module,
     loader: DataLoader,
+    criterion: torch.nn.Module,
     device: torch.device,
     mode: str,
     num_classes: int,
@@ -96,7 +98,7 @@ def evaluate(
             logits = model(images, tabular)
 
         # loss
-        loss = torch.nn.functional.cross_entropy(logits, labels)
+        loss = criterion(logits, labels)
 
         batch_size = labels.size(0)
         running_loss += loss.item() * batch_size
