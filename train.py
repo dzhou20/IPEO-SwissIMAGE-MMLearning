@@ -196,6 +196,9 @@ def main() -> None:
         # 3. best model (F1)
         val_macro_f1 = val_metrics["macro_f1"]
 
+        if val_loss < best_val_loss - min_delta:
+            best_val_loss = val_loss
+
         if val_macro_f1 > best_val_f1:
             best_val_f1 = val_macro_f1
             best_ckpt_path = str(ckpt_dir / "best.pt")
