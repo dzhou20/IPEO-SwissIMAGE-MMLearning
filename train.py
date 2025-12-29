@@ -29,14 +29,16 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--backbone", choices=["resnet18", "vit"], default="resnet18")
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--epochs", type=int, default=100)
     # the default training epoch is set to 10 for quick testing
     parser.add_argument("--lr", type=float, default=1e-4)
-    parser.add_argument("--num_workers", type=int, default=4)
+    parser.add_argument("--num_workers", type=int, default=1)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--pretrained", action="store_true")
     parser.add_argument("--run_name", default=None)
     parser.add_argument("--image_size", type=int, default=IMAGE_SIZE[0])
+    parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume.")
+    
     return parser.parse_args()
 
 
@@ -91,6 +93,32 @@ def main() -> None:
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
 
+    # params for best model and early stopping
+    best_val_f1 = -1.0
+    best_val_loss = float("inf")
+    patience = 15
+    min_delta = 1e-4
+    no_improve_epochs = 0
+    min_epochs = 50 
+    start_epoch = 1
+    
+    # resume from checkpoint
+    if args.resume:
+        ckpt = torch.load(args.resume, map_location=device)
+        model.load_state_dict(ckpt["model"])
+        optimizer.load_state_dict(ckpt["optimizer"])
+    
+        start_epoch = ckpt["epoch"] + 1
+        best_val_loss = ckpt["best_val_loss"]
+        best_val_f1 = ckpt["best_val_f1"]
+        no_improve_epochs = ckpt["no_improve_epochs"]
+    
+        print(
+            f"[info] Resumed from epoch {ckpt['epoch']} | "
+            f"best_val_loss={best_val_loss:.4f} | best_val_f1={best_val_f1:.4f}"
+        )
+
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     if args.run_name:
         run_name = args.run_name
@@ -103,10 +131,14 @@ def main() -> None:
     ckpt_dir = run_dir / "checkpoints"
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     metrics_path = run_dir / "metrics.csv"
+    
 
-    best_val = -1.0
+
+    # history
+    train_accs = []
     train_losses = []
     val_accs = []
+    val_losses = []
     val_macro_f1s = []
     val_micro_f1s = []
 
@@ -116,8 +148,10 @@ def main() -> None:
             writer.writerow(
                 [
                     "epoch",
+                    "train_accuracy",
                     "train_loss",
                     "val_accuracy",
+                    "val_loss",
                     "val_macro_f1",
                     "val_micro_f1",
                     "best_checkpoint",
@@ -125,23 +159,76 @@ def main() -> None:
                 ]
             )
 
-    for epoch in range(1, args.epochs + 1):
-        loss = train_one_epoch(model, train_loader, optimizer, device, mode=args.mode)
-        val_metrics, _, _, _ = evaluate(
+    for epoch in range(start_epoch, args.epochs + 1):
+        best_ckpt_path = ""
+        last_ckpt_path = ""
+        
+        # 1. train
+        train_loss, train_acc = train_one_epoch(model, train_loader, optimizer, device, mode=args.mode)
+        # 2. val
+        val_metrics,val_loss, _, _, _ = evaluate(
             model, val_loader, device, mode=args.mode, num_classes=NUM_CLASSES
         )
 
-        val_score = val_metrics["macro_f1"]
-        best_ckpt_path = ""
-        if val_score > best_val:
-            best_val = val_score
-            best_ckpt_path = str(ckpt_dir / "best.pt")
-            torch.save(model.state_dict(), best_ckpt_path)
+        # print result of current epoch
+        print(
+            f"Epoch {epoch}/{args.epochs} | "
+            f"train_loss={train_loss:.4f} | train_acc={train_acc:.4f} | "
+            f"val_loss={val_loss:.4f} | val_acc={val_metrics['accuracy']:.4f} | "
+            f"val_macro_f1={val_metrics['macro_f1']:.4f}"
+        )
+        
+        # 3. best model (F1)
+        val_macro_f1 = val_metrics["macro_f1"]
 
-        last_ckpt_path = str(ckpt_dir / "last.pt")
-        torch.save(model.state_dict(), last_ckpt_path)
-        train_losses.append(loss)
+        if val_macro_f1 > best_val_f1:
+            best_val_f1 = val_macro_f1
+            best_ckpt_path = str(ckpt_dir / "best.pt")
+            torch.save(
+                {
+                    "epoch": epoch,
+                    "model": model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "best_val_loss": best_val_loss,
+                    "best_val_f1": best_val_f1,
+                    "no_improve_epochs": no_improve_epochs,
+                },
+                best_ckpt_path,
+            )
+            print(f"[Best Model] Saved successfully: {best_ckpt_path}")
+
+        # 4. check early stopping state (loss)
+        if val_loss < best_val_loss - min_delta:
+            best_val_loss = val_loss
+            no_improve_epochs = 0
+        else:
+            no_improve_epochs += 1
+
+        # 5. last checkpoint
+        # save checkpoint every 5 epochs 
+        ckpt_interval = 5 
+        if epoch % ckpt_interval == 0:
+            last_ckpt_path = ckpt_dir / f"last_{epoch:03d}.pt"
+            torch.save(
+                {
+                    "epoch": epoch,
+                    "model": model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "best_val_loss": best_val_loss,
+                    "best_val_f1": best_val_f1,
+                    "no_improve_epochs": no_improve_epochs,
+                },
+                last_ckpt_path,
+            )
+            print(f"[Checkpoint] Saved successfully: {last_ckpt_path}")
+
+        # 6. save into CSV 
+        
+        # add into history   
+        train_accs.append(train_acc)
+        train_losses.append(train_loss)
         val_accs.append(val_metrics["accuracy"])
+        val_losses.append(val_loss)
         val_macro_f1s.append(val_metrics["macro_f1"])
         val_micro_f1s.append(val_metrics["micro_f1"])
 
@@ -150,8 +237,10 @@ def main() -> None:
             writer.writerow(
                 [
                     epoch,
-                    f"{loss:.6f}",
+                    f"{train_acc:.6f}",
+                    f"{train_loss:.6f}",
                     f"{val_metrics['accuracy']:.6f}",
+                    f"{val_loss:.6f}",
                     f"{val_metrics['macro_f1']:.6f}",
                     f"{val_metrics['micro_f1']:.6f}",
                     best_ckpt_path,
@@ -159,13 +248,34 @@ def main() -> None:
                 ]
             )
 
-        print(
-            f"Epoch {epoch}/{args.epochs} | loss={loss:.4f} | "
-            f"val_acc={val_metrics['accuracy']:.4f} | val_macro_f1={val_metrics['macro_f1']:.4f}"
-        )
-
-    model.load_state_dict(torch.load(ckpt_dir / "best.pt", map_location=device))
-    test_metrics, y_true, y_pred, per_class = evaluate(
+        # 7. execute early stopping
+        if no_improve_epochs >= patience and epoch >= min_epochs:
+            # final safety save
+            last_ckpt_path = ckpt_dir / f"last_{epoch:03d}.pt"
+            torch.save(
+                {
+                    "epoch": epoch,
+                    "model": model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "best_val_loss": best_val_loss,
+                    "best_val_f1": best_val_f1,
+                    "no_improve_epochs": no_improve_epochs,
+                },
+                last_ckpt_path,
+            )
+            print(f"[Checkpoint] Saved successfully: {last_ckpt_path}")
+            print(
+                f"[info] Early stopping triggered at epoch {epoch}. "
+                f"Best val loss: {best_val_loss:.4f}, "
+                f"Best val macro-F1: {best_val_f1:.4f}"
+            )
+            break
+                  
+            
+    # load best model to test
+    ckpt = torch.load(ckpt_dir / "best.pt", map_location=device)
+    model.load_state_dict(ckpt["model"])
+    test_metrics, _, y_true, y_pred, per_class = evaluate(
         model, test_loader, device, mode=args.mode, num_classes=NUM_CLASSES
     )
 
@@ -195,7 +305,9 @@ def main() -> None:
     )
     per_class_df.to_csv(run_dir / "per_class_f1.csv", index=False)
 
-    epochs = list(range(1, args.epochs + 1))
+
+    epochs = range(1, len(train_losses) + 1)
+
     if train_losses:
         plt.figure(figsize=(6, 4))
         plt.plot(epochs, train_losses, marker="o")
@@ -229,7 +341,33 @@ def main() -> None:
         plt.tight_layout()
         plt.savefig(run_dir / "val_f1_vs_epoch.png", dpi=300)
         plt.close()
+        
+    # draw all in one figure
+    fig, ax1 = plt.subplots(figsize=(7, 5))
 
+    # ---- Left y-axis: Loss ----
+    ax1.set_xlabel("Epoch")
+    ax1.set_ylabel("Loss")
+    l1 = ax1.plot(epochs, train_losses, marker="o", label="Train Loss")
+    l2 = ax1.plot(epochs, val_losses, marker="s", label="Val Loss")
+    ax1.tick_params(axis="y")
+    
+    # ---- Right y-axis: Accuracy / F1 ----
+    ax2 = ax1.twinx()
+    ax2.set_ylabel("Accuracy / F1")
+    l3 = ax2.plot(epochs, train_accs, marker="^", label="Train Accuracy")
+    l4 = ax2.plot(epochs, val_macro_f1s, marker="d", label="Val Macro-F1")
+    ax2.tick_params(axis="y")
+    
+    # ---- Unified legend ----
+    lines = l1 + l2 + l3 + l4
+    labels = [line.get_label() for line in lines]
+    ax1.legend(lines, labels, loc="center right")
+    
+    plt.title("Training and Validation Metrics")
+    plt.tight_layout()
+    plt.savefig(run_dir / "train_all_indices.png", dpi=300)
+    plt.close()
 
 if __name__ == "__main__":
     main()

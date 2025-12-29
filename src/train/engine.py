@@ -17,11 +17,13 @@ def train_one_epoch(
 ) -> float:
     model.train()
     running_loss = 0.0
-    num_batches = 0
+    num_samples = 0
+    correct = 0
 
     for batch in loader:
         if batch is None:
             continue
+            
         optimizer.zero_grad()
 
         if mode == "image":
@@ -39,11 +41,20 @@ def train_one_epoch(
         loss = torch.nn.functional.cross_entropy(logits, labels)
         loss.backward()
         optimizer.step()
+        
+        # loss      
+        batch_size = labels.size(0)
+        running_loss += loss.item() * batch_size
+        num_samples += batch_size
 
-        running_loss += loss.item()
-        num_batches += 1
+        # accuracy 
+        preds = torch.argmax(logits, dim=1)
+        correct += (preds == labels).sum().item()
 
-    return running_loss / max(num_batches, 1)
+    train_loss = running_loss / max(num_samples, 1)
+    train_acc = correct / max(num_samples, 1)
+
+    return train_loss, train_acc
 
 
 @torch.no_grad()
@@ -53,30 +64,60 @@ def evaluate(
     device: torch.device,
     mode: str,
     num_classes: int,
-) -> Tuple[Dict[str, float], torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> Tuple[
+    Dict[str, float], 
+    float,
+    torch.Tensor, 
+    torch.Tensor, 
+    torch.Tensor
+    ]:
     model.eval()
+    
     all_preds = []
     all_labels = []
+    
+    running_loss = 0.0
+    num_samples = 0
 
     for batch in loader:
         if batch is None:
             continue
+            
         if mode == "image":
             images, labels = batch
             images = images.to(device)
+            labels = labels.to(device)
             logits = model(images)
         else:
             images, tabular, labels = batch
             images = images.to(device)
             tabular = tabular.to(device)
+            labels = labels.to(device)
             logits = model(images, tabular)
+
+        # loss
+        loss = torch.nn.functional.cross_entropy(logits, labels)
+
+        batch_size = labels.size(0)
+        running_loss += loss.item() * batch_size
+        num_samples += batch_size
 
         preds = torch.argmax(logits, dim=1)
         all_preds.append(preds.cpu())
         all_labels.append(labels.cpu())
 
+    val_loss = running_loss / max(num_samples, 1)
+
     y_pred = torch.cat(all_preds).numpy()
     y_true = torch.cat(all_labels).numpy()
+    
     metrics = classification_metrics(y_true, y_pred)
     per_class = per_class_f1(y_true, y_pred, num_classes=num_classes)
-    return metrics, torch.from_numpy(y_true), torch.from_numpy(y_pred), torch.from_numpy(per_class)
+    
+    return (
+        metrics,
+        val_loss,
+        torch.from_numpy(y_true),
+        torch.from_numpy(y_pred),
+        torch.from_numpy(per_class),
+    )
