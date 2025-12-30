@@ -83,6 +83,11 @@ Early fusion with all SWECO variables (merged and de-duplicated):
 python train.py --mode fusion --group all --backbone resnet18
 ```
 
+Early fusion with a SWECO group combination (example: bioclim + vege):
+```
+python train.py --mode fusion --group "bioclim, vege" --backbone resnet18
+```
+
 Switch backbone to ViT:
 ```
 python train.py --mode image --backbone vit
