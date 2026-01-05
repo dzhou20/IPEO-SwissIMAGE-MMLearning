@@ -20,6 +20,7 @@ def build_backbone(
         feature_dim = model.fc.in_features
         model.fc = nn.Identity()
         return model, feature_dim
+        
 
     if backbone == "vit":
         # Patch size 8 is compatible with 200x200 input (200/8=25).
@@ -33,4 +34,24 @@ def build_backbone(
         )
         return model, model.num_features
 
-    raise ValueError("Unsupported backbone. Use 'resnet18' or 'vit'.")
+    # ---------------- ConvNeXt Tiny ----------------
+    if backbone == "convnext_tiny":
+        model = timm.create_model(
+            "convnext_tiny",
+            pretrained=pretrained,
+            num_classes=0,        # output features
+            global_pool="avg",
+        )
+        return model, model.num_features
+
+    # ---------------- EfficientNet-B0 ----------------
+    if backbone == "efficientnet_b0":
+        model = timm.create_model(
+            "efficientnet_b0",
+            pretrained=pretrained,
+            num_classes=0,
+            global_pool="avg",
+        )
+        return model, model.num_features
+
+    raise ValueError("Unsupported backbone. Use 'resnet18', 'vit','convnext_tiny' or 'efficientnet_b0'.")

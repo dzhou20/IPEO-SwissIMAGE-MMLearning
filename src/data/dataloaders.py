@@ -17,24 +17,6 @@ def _resolve_group_columns(df: pd.DataFrame, group: Optional[str]) -> Optional[l
     if group is None:
         return None
 
-    # if group == "all":
-    #     desired = []
-    #     seen = set()
-    #     for cols in sweco_variables_dict.values():
-    #         for col in cols:
-    #             if col not in seen:
-    #                 desired.append(col)
-    #                 seen.add(col)
-    #     group = "__all_sweco__"
-
-    # if group not in sweco_variables_dict and group != "__all_sweco__":
-    #     raise ValueError(f"Unknown group: {group}. Options: {list(sweco_variables_dict)} + ['all']")
-
-    # if group == "__all_sweco__":
-    #     desired = desired
-    # else:
-    #     desired = sweco_variables_dict[group]
-
     desired = []
     seen = set() 
 
