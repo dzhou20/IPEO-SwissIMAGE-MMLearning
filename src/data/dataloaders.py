@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data._utils.collate import default_collate
 
 from config import CSV_PATH, IMAGE_DIR, IMAGE_SIZE, NUM_CLASSES
+from eunis_labels_mapping import level2_id_to_level1_id, num_level1_classes
 from sweco_group_of_variables import sweco_variables_dict
 from src.data.dataset import DatasetConfig, SwissImageDataset
 
@@ -85,20 +86,26 @@ def build_dataloaders(
     group: Optional[str],
     batch_size: int,
     num_workers: int,
+    include_level1: bool = False,
+    label_level: int = 2,
     image_dir: str = IMAGE_DIR,
     csv_path: str = CSV_PATH,
     image_size: tuple[int, int] = IMAGE_SIZE,
 ):
     df = pd.read_csv(csv_path)
     total_count = len(df)
-    df["img_path"] = df["id"].apply(lambda x: str(Path(image_dir) / f"{x}.tif"))
-    df["img_exists"] = df["img_path"].apply(lambda p: Path(p).exists())
-    missing_count = int((~df["img_exists"]).sum())
-    if missing_count > 0:
-        print(f"[warn] Missing images: {missing_count} rows will be skipped.")
-    df = df[df["img_exists"]].drop(columns=["img_exists"]).reset_index(drop=True)
-    used_count = len(df)
-    print(f"[info] Dataset rows: total={total_count}, used={used_count}, missing={missing_count}")
+    if mode != "tabular":
+        df["img_path"] = df["id"].apply(lambda x: str(Path(image_dir) / f"{x}.tif"))
+        df["img_exists"] = df["img_path"].apply(lambda p: Path(p).exists())
+        missing_count = int((~df["img_exists"]).sum())
+        if missing_count > 0:
+            print(f"[warn] Missing images: {missing_count} rows will be skipped.")
+        df = df[df["img_exists"]].drop(columns=["img_exists"]).reset_index(drop=True)
+        used_count = len(df)
+        print(f"[info] Dataset rows: total={total_count}, used={used_count}, missing={missing_count}")
+    else:
+        used_count = len(df)
+        print(f"[info] Dataset rows: total={total_count}, used={used_count}, missing=0")
 
     group_cols = _resolve_group_columns(df, group)
     if group_cols is not None:
@@ -108,13 +115,24 @@ def build_dataloaders(
     val_df = df[df["split"] == "val"]
     test_df = df[df["split"] == "test"]
 
-    counts = train_df["EUNIS_cls"].value_counts().sort_index()
-    counts_full = np.zeros(NUM_CLASSES)
-    for i, count in counts.items():
-        if i < NUM_CLASSES: counts_full[i] = count
+    if label_level == 1:
+        mapped = train_df["EUNIS_cls"].map(level2_id_to_level1_id)
+        counts = mapped.value_counts().sort_index()
+        counts_full = np.zeros(num_level1_classes)
+        for i, count in counts.items():
+            if i < num_level1_classes:
+                counts_full[i] = count
+        num_classes = num_level1_classes
+    else:
+        counts = train_df["EUNIS_cls"].value_counts().sort_index()
+        counts_full = np.zeros(NUM_CLASSES)
+        for i, count in counts.items():
+            if i < NUM_CLASSES:
+                counts_full[i] = count
+        num_classes = NUM_CLASSES
     
     weights = 1.0 / (np.sqrt(counts_full) + 1e-6)
-    weights = weights / weights.sum() * NUM_CLASSES
+    weights = weights / weights.sum() * num_classes
 
     train_cfg = DatasetConfig(
         image_dir=image_dir,
@@ -122,6 +140,8 @@ def build_dataloaders(
         mode=mode,
         group_cols=group_cols,
         augment=True,
+        include_level1=include_level1,
+        label_level=label_level,
     )
     eval_cfg = DatasetConfig(
         image_dir=image_dir,
@@ -129,6 +149,8 @@ def build_dataloaders(
         mode=mode,
         group_cols=group_cols,
         augment=False,
+        include_level1=include_level1,
+        label_level=label_level,
     )
 
     train_ds = SwissImageDataset(train_df, train_cfg)

@@ -1,3 +1,5 @@
+from eunis_labels import eunis_id_to_lab
+
 level2_to_level1_code = {
     'Surface standing waters': 'C',
     'Surface running waters': 'C',
@@ -32,3 +34,24 @@ level2_to_level1_name = {
     level2: level1_code_to_name[code]
     for level2, code in level2_to_level1_code.items()
 }
+
+level1_codes_in_use = []
+level2_id_to_level1_id = {}
+level2_id_to_level1_code = {}
+
+for level2_id in sorted(eunis_id_to_lab):
+    level2_name = eunis_id_to_lab[level2_id]
+    code = level2_to_level1_code[level2_name]
+    if code not in level1_codes_in_use:
+        level1_codes_in_use.append(code)
+    level1_id = level1_codes_in_use.index(code)
+    level2_id_to_level1_id[level2_id] = level1_id
+    level2_id_to_level1_code[level2_id] = code
+
+level1_id_to_code = {idx: code for idx, code in enumerate(level1_codes_in_use)}
+level1_id_to_name = {idx: level1_code_to_name[code] for idx, code in enumerate(level1_codes_in_use)}
+num_level1_classes = len(level1_codes_in_use)
+
+level1_id_to_level2_ids = {}
+for level2_id, level1_id in level2_id_to_level1_id.items():
+    level1_id_to_level2_ids.setdefault(level1_id, []).append(level2_id)

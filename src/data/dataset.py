@@ -13,6 +13,7 @@ import rasterio
 from rasterio.errors import RasterioIOError
 
 from config import IMAGE_MEAN, IMAGE_STD
+from eunis_labels_mapping import level2_id_to_level1_id
 
 
 @dataclass
@@ -22,6 +23,8 @@ class DatasetConfig:
     mode: str
     group_cols: Optional[list[str]]
     augment: bool
+    include_level1: bool = False
+    label_level: int = 2
 
 
 def _normalize_image(img: torch.Tensor) -> torch.Tensor:
@@ -53,7 +56,7 @@ class SwissImageDataset(Dataset):
         self.df = df.reset_index(drop=True)
         self.config = config
 
-        if self.config.mode not in {"image", "fusion"}:
+        if self.config.mode not in {"image", "fusion", "tabular"}:
             raise ValueError(f"Unsupported mode: {self.config.mode}")
 
     def __len__(self) -> int:
@@ -87,6 +90,21 @@ class SwissImageDataset(Dataset):
 
     def __getitem__(self, index: int):
         row = self.df.loc[index]
+        label = int(row["EUNIS_cls"])
+        level1_label = None
+        if self.config.include_level1:
+            level1_label = level2_id_to_level1_id[label]
+        if self.config.label_level == 1:
+            if level1_label is None:
+                level1_label = level2_id_to_level1_id[label]
+            label = level1_label
+
+        if self.config.mode == "tabular":
+            tabular = self._load_tabular(index)
+            if self.config.include_level1:
+                return tabular, label, level1_label
+            return tabular, label
+
         if "img_path" in row:
             image_path = Path(row["img_path"])
         else:
@@ -95,10 +113,13 @@ class SwissImageDataset(Dataset):
             image = self._load_image(str(image_path))
         except RasterioIOError:
             return None
-        label = int(row["EUNIS_cls"])
 
         if self.config.mode == "image":
+            if self.config.include_level1:
+                return image, label, level1_label
             return image, label
 
         tabular = self._load_tabular(index)
+        if self.config.include_level1:
+            return image, tabular, label, level1_label
         return image, tabular, label
