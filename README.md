@@ -140,8 +140,9 @@ Unless otherwise specified, all experiments are conducted under the following de
 | A8 | ResNet18        | Yes            | hydro           | None                                            | Early  |
 | A9 | ResNet18        | Yes            | population      | None                                            | Early  |
 | B1 | ResNet18        | No             | All             | None                                            | No     |
-| C1 | ViT             | Yes            | All             | None                                            | Early  |
-| C2 | convnext_tiny   | Yes            | All             | None                                            | Early  |
-| C3 | efficientnet_b0 | Yes            | All             | None                                            | Early  |
-| D1 | ResNet18        | Yes            | All             | Stage-wise Fine-tuning (Progressive Unfreezing) | Early  |
-| E1 | ResNet18        | Yes            | All             | Adjust hyperparameters                          | Early  |
+| C1 | ResNet18        | Yes            | All             | None                                            | Late   |
+| D1 | ViT             | Yes            | All             | None                                            | Early  |
+| D2 | ConvNeXt-Tiny   | Yes            | All             | None                                            | Early  |
+| D3 | EfficientNet-B0 | Yes            | All             | None                                            | Early  |
+| E1 | ResNet18        | Yes            | All             | Stage-wise Fine-tuning (Progressive Unfreezing) | Early  |
+| F1 | ResNet18        | Yes            | All             | Adjust hyperparameters                          | Early  |
