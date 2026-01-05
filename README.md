@@ -122,6 +122,7 @@ Unless otherwise specified, all experiments are conducted under the following de
 - Minimum epochs: 30
 - Batch size: 32
 - Learning rate: 1e-4
+- Weight decay: 1e-4
 - Scheduler: ReduceLROnPlateau (patience = 5), monitored on validation macro-F1 score
 - Loss function: Cross-Entropy Loss with class weights
 - Early stopping: triggered after 10 consecutive epochs without improvement in validation loss
