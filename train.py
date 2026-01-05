@@ -95,7 +95,7 @@ def main() -> None:
         optimizer, 
         mode='max',       
         factor=0.1,       
-        patience=10
+        patience=5
     )
 
 

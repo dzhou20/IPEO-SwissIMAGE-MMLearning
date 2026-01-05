@@ -108,3 +108,40 @@ Notes:
 - swissIMAGE orthophotos: https://www.swisstopo.admin.ch/en/orthoimage-swissimage-10
 - SWECO25 database: Kuelling et al., 2024. SWECO25: a cross-thematic raster database for ecological research in Switzerland.
 - EUNIS Habitat Classification: Chytry et al., 2020.
+
+
+## Ablation Study
+
+ResNet18T denotes a ResNet18 backbone initialized with ImageNet pretrained weights.
+
+**Default Training Configuration**
+
+Unless otherwise specified, all experiments are conducted under the following default settings:
+
+- Maximum epochs: 100
+- Minimum epochs: 30
+- Batch size: 32
+- Learning rate: 1e-4
+- Scheduler: ReduceLROnPlateau (patience = 5), monitored on validation macro-F1 score
+- Loss function: Cross-Entropy Loss with class weights
+- Early stopping: triggered after 10 consecutive epochs without improvement in validation loss
+- Fusion mode: Early fusion
+
+| ID | Image Backbone  | Image Features | SWECO Features  | Strategy                                        | Fusion |
+| -- | --------------- | -------------- | --------------- | ----------------------------------------------- | ------ |
+| A0 | ResNet18        | Yes            | None            | None                                            | No     |
+| A1 | ResNet18        | Yes            | All             | None                                            | Early  |
+| A2 | ResNet18        | Yes            | geol            | None                                            | Early  |
+| A3 | ResNet18        | Yes            | edaph           | None                                            | Early  |
+| A4 | ResNet18        | Yes            | vege            | None                                            | Early  |
+| A5 | ResNet18        | Yes            | bioclim         | None                                            | Early  |
+| A6 | ResNet18        | Yes            | lulc_grasslands | None                                            | Early  |
+| A7 | ResNet18        | Yes            | lulc_all        | None                                            | Early  |
+| A8 | ResNet18        | Yes            | hydro           | None                                            | Early  |
+| A9 | ResNet18        | Yes            | population      | None                                            | Early  |
+| B1 | ResNet18        | No             | All             | None                                            | No     |
+| C1 | ViT             | Yes            | All             | None                                            | Early  |
+| C2 | convnext_tiny   | Yes            | All             | None                                            | Early  |
+| C3 | efficientnet_b0 | Yes            | All             | None                                            | Early  |
+| D1 | ResNet18        | Yes            | All             | Stage-wise Fine-tuning (Progressive Unfreezing) | Early  |
+| E1 | ResNet18        | Yes            | All             | Adjust hyperparameters                          | Early  |
