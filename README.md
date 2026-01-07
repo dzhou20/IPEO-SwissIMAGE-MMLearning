@@ -73,6 +73,11 @@ Image-only baseline (ResNet18, 200x200 input):
 python train.py --mode image --backbone resnet18
 ```
 
+Tabular-only baseline (all SWECO variables):
+```
+python train.py --mode tabular --group all
+```
+
 Early fusion with a single SWECO group (example: bioclim):
 ```
 python train.py --mode fusion --group bioclim --backbone resnet18
@@ -127,6 +132,7 @@ Unless otherwise specified, all experiments are conducted under the following de
 - Loss function: Cross-Entropy Loss with class weights
 - Early stopping: triggered after 10 consecutive epochs without improvement in validation loss
 - Fusion mode: Early fusion
+- Pretrained: True
 
 | ID | Image Backbone  | Image Features | SWECO Features  | Strategy                                        | Fusion |
 | -- | --------------- | -------------- | --------------- | ----------------------------------------------- | ------ |
@@ -146,7 +152,8 @@ Unless otherwise specified, all experiments are conducted under the following de
 | D1 | ViT             | Yes            | All             | None                                            | Early  |
 | D2 | ConvNeXt-Tiny   | Yes            | All             | None                                            | Early  |
 | D3 | EfficientNet-B0 | Yes            | All             | None                                            | Early  |
-| E1 | ResNet18        | Yes            | All             | Stage-wise Fine-tuning (Progressive Unfreezing) | Early  |
-| F1 | ResNet18        | Yes            | All             | Adjust hyperparameters                          | Early  |
-| G1 | ResNet18        | Yes            | All             | Two-stage classification model                  | Early  |
+| E1 | ResNet18        | Yes            | All             | Pretrained = False                              | Early  |
+| F1 | ResNet18        | Yes            | All             | Stage-wise Fine-tuning (Progressive Unfreezing) | Early  |
+| G1 | ResNet18        | Yes            | All             | Adjust hyperparameters                          | Early  |
+| H1 | ResNet18        | Yes            | All             | Two-stage classification model                  | Early  |
 
