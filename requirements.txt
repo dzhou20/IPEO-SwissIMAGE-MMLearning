@@ -11,7 +11,7 @@ geopandas
 shapely
 fiona
 pyproj
-gdal
+
 matplotlib
 seaborn
 jupyter
