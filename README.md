@@ -147,6 +147,5 @@ Unless otherwise specified, all experiments are conducted under the following de
 | D3 | EfficientNet-B0 | Yes            | All             | None                                            | Early  |
 | E1 | ResNet18        | Yes            | All             | Stage-wise Fine-tuning (Progressive Unfreezing) | Early  |
 | F1 | ResNet18        | Yes            | All             | Adjust hyperparameters                          | Early  |
-<<<<<<< Updated upstream
 | G1 | ResNet18        | Yes            | All             | Two-stage classification model                  | Early  |
 
