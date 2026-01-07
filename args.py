@@ -28,9 +28,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--freeze_epochs", type=int, default=10)
     parser.add_argument("--encoder_lr_drop_epoch", type=int, default=20)
     parser.add_argument("--encoder_lr_after", type=float, default=1e-5)
+    parser.add_argument("--unfreeze_layer", type = str, default="layer4")
 
     # ---------- system ----------
-    parser.add_argument("--num_workers", type=int, default=1)
+    parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--image_size", type=int, default=IMAGE_SIZE[0])
     parser.add_argument("--pretrained", action="store_true")
