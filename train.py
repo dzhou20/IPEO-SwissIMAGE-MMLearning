@@ -12,7 +12,7 @@ import pandas as pd
 from config import IMAGE_SIZE, NUM_CLASSES, OUTPUT_DIR
 from eunis_labels import eunis_id_to_lab
 from src.data.dataloaders import build_dataloaders
-from src.models.fusion import ImageOnlyModel, EarlyFusionModel
+from src.models.fusion import TabularOnlyModel, ImageOnlyModel, EarlyFusionModel, GatedFusionModel, LateFusionModel
 from src.train.engine import train_one_epoch, evaluate
 from src.utils.seed import set_seed
 from src.utils.visualize import save_confusion_matrix, save_normalized_confusion_matrix
@@ -21,19 +21,19 @@ from src.utils.plot import plot_all
 # ----------------------------- Argument parser -----------------------------
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["image", "fusion"], default="image")
+    parser.add_argument("--mode", choices=["tabular", "image", "fusion"], default="image")
     parser.add_argument(
         "--group",
         default=None,
         help="SWECO group name, required for fusion.",
     )
-    parser.add_argument("--backbone", choices=["resnet18", "vit"], default="resnet18")
+    parser.add_argument("--backbone", choices=["resnet18", "efficientnet_b0", "vit"], default="resnet18")
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--epochs", type=int, default=50)
     # the default training epoch is set to 10 for quick testing
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weight_decay", type=float, default=1e-4, help="L2 regularization")
-    parser.add_argument("--num_workers", type=int, default=1)
+    parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--pretrained", action="store_true")
     parser.add_argument("--run_name", default=None)
@@ -59,9 +59,11 @@ def main() -> None:
         num_workers=args.num_workers,
         image_size=image_size,
     )
-    
-    # ------------------------- Model -------------------------
-    if args.mode == "image":
+
+    if args.mode == "tabular":
+        tabular_dim = len(group_cols)  
+        model = TabularOnlyModel(tabular_dim=tabular_dim)
+    elif args.mode == "image":
         model = ImageOnlyModel(args.backbone, args.pretrained, image_size=image_size)
     else:
         tabular_dim = len(group_cols)
@@ -71,6 +73,18 @@ def main() -> None:
             tabular_dim=tabular_dim,
             image_size=image_size,
         )
+        # model = GatedFusionModel(
+        #     backbone=args.backbone,
+        #     pretrained=args.pretrained,
+        #     tabular_dim=tabular_dim, 
+        #     image_size=image_size
+        # )
+        # model = LateFusionModel(
+        #     args.backbone,
+        #     args.pretrained,
+        #     tabular_dim=tabular_dim,
+        #     image_size=image_size,
+        # )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
@@ -98,7 +112,19 @@ def main() -> None:
     class_weights = torch.FloatTensor(weights).to(device)
     criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
 
+    backbone_params = []
+    other_params = []
+
+    for name, param in model.named_parameters():
+        if "encoder" in name or "backbone" in name:
+            backbone_params.append(param)
+        else:
+            other_params.append(param)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    # optimizer = torch.optim.AdamW([
+    #     {'params': backbone_params, 'lr': 1e-5}, 
+    #     {'params': other_params, 'lr': args.lr}     
+    # ],  weight_decay=args.weight_decay)
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, 
@@ -202,6 +228,13 @@ def main() -> None:
             f"val_loss={val_loss:.4f} | val_acc={val_metrics['accuracy']:.4f} | "
             f"val_macro_f1={val_metrics['macro_f1']:.4f}"
         )
+
+        if hasattr(model, 'fusion_weight'):
+            with torch.no_grad():
+                alpha_val = torch.sigmoid(model.fusion_weight).item()
+                
+            print(f"--- [Alpha Monitor] Epoch {epoch}: {alpha_val:.4f} "
+                f"(Image Weight: {alpha_val:.2%} | Tabular Weight: {1-alpha_val:.2%}) ---")
         
         # 3. best model (F1)
         val_macro_f1 = val_metrics["macro_f1"]

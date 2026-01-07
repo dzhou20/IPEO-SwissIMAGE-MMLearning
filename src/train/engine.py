@@ -27,7 +27,12 @@ def train_one_epoch(
             
         optimizer.zero_grad()
 
-        if mode == "image":
+        if mode == "tabular":
+            _, tabular, labels = batch
+            tabular = tabular.to(device)
+            labels = labels.to(device)
+            logits = model(tabular)
+        elif mode == "image":
             images, labels = batch
             images = images.to(device)
             labels = labels.to(device)
@@ -85,7 +90,12 @@ def evaluate(
         if batch is None:
             continue
             
-        if mode == "image":
+        if mode == "tabular":
+            _, tabular, labels = batch
+            tabular = tabular.to(device)
+            labels = labels.to(device)
+            logits = model(tabular)
+        elif mode == "image":
             images, labels = batch
             images = images.to(device)
             labels = labels.to(device)

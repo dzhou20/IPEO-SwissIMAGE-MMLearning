@@ -20,6 +20,13 @@ def build_backbone(
         feature_dim = model.fc.in_features
         model.fc = nn.Identity()
         return model, feature_dim
+    
+    if backbone == "efficientnet_b0":
+        weights = models.EfficientNet_B0_Weights.DEFAULT if pretrained else None
+        model = models.efficientnet_b0(weights=weights)
+        feature_dim = model.classifier[1].in_features
+        model.classifier = nn.Identity()
+        return model, feature_dim
 
     if backbone == "vit":
         # Patch size 8 is compatible with 200x200 input (200/8=25).
@@ -33,4 +40,4 @@ def build_backbone(
         )
         return model, model.num_features
 
-    raise ValueError("Unsupported backbone. Use 'resnet18' or 'vit'.")
+    raise ValueError("Unsupported backbone. Use 'resnet18' or 'efficientnet_b0' or 'vit'.")

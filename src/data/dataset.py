@@ -53,7 +53,7 @@ class SwissImageDataset(Dataset):
         self.df = df.reset_index(drop=True)
         self.config = config
 
-        if self.config.mode not in {"image", "fusion"}:
+        if self.config.mode not in {"tabular", "image", "fusion"}:
             raise ValueError(f"Unsupported mode: {self.config.mode}")
 
     def __len__(self) -> int:
