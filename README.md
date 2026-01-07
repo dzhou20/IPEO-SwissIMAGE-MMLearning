@@ -73,6 +73,11 @@ Image-only baseline (ResNet18, 200x200 input):
 python train.py --mode image --backbone resnet18
 ```
 
+Tabular-only baseline (all SWECO variables):
+```
+python train.py --mode tabular --group all
+```
+
 Early fusion with a single SWECO group (example: bioclim):
 ```
 python train.py --mode fusion --group bioclim --backbone resnet18
