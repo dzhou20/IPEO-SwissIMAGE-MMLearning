@@ -47,9 +47,8 @@ def main() -> None:
     }
     
     # ------------------------- Model -------------------------
-    if args.mode == "tabular":
-        tabular_dim = len(group_cols)  
-        model = TabularOnlyModel(tabular_dim=tabular_dim)
+    if args.mode == "tabular": 
+        model = TabularOnlyModel(tabular_dim=len(group_cols))
     elif args.mode == "image":
         model = ImageOnlyModel(args.backbone, args.pretrained, image_size=image_size)
     else:
@@ -126,7 +125,6 @@ def main() -> None:
     )
 
 
-
     # ---------------------- State ----------------------
     state = TrainingState(args.patience, args.min_delta)
 
@@ -146,6 +144,7 @@ def main() -> None:
     
         model.load_state_dict(ckpt["model"])
         optimizer.load_state_dict(ckpt["optimizer"])
+        scheduler.load_state_dict(ckpt["scheduler"])
     
         # restore training state
         state.best_val_f1 = ckpt["training_state"]["best_val_f1"]
@@ -243,6 +242,7 @@ def main() -> None:
                     "epoch": epoch,
                     "model": model.state_dict(),
                     "optimizer": optimizer.state_dict(),
+                    "scheduler": scheduler.state_dict(),
                     "training_state": {
                         "best_val_f1": state.best_val_f1,
                         "best_val_loss": state.best_val_loss,
@@ -261,6 +261,7 @@ def main() -> None:
                     "epoch": epoch,
                     "model": model.state_dict(),
                     "optimizer": optimizer.state_dict(),
+                    "scheduler": scheduler.state_dict(),
                     "training_state": {
                         "best_val_f1": state.best_val_f1,
                         "best_val_loss": state.best_val_loss,
