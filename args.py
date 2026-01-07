@@ -7,7 +7,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
 
     # ---------- basic ----------
-    parser.add_argument("--mode", choices=["image", "fusion"], default="image")
+    parser.add_argument("--mode", choices=["tabular", "image", "fusion"], default="image")
     parser.add_argument("--group", default=None)
     parser.add_argument("--backbone", choices=[
         "resnet18", "vit", "convnext_tiny", "efficientnet_b0"
