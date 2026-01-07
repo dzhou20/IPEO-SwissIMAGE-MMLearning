@@ -141,7 +141,8 @@ Unless otherwise specified, all experiments are conducted under the following de
 | A8 | ResNet18        | Yes            | hydro           | None                                            | Early  |
 | A9 | ResNet18        | Yes            | population      | None                                            | Early  |
 | B1 | ResNet18        | No             | All             | None                                            | No     |
-| C1 | ResNet18        | Yes            | All             | None                                            | Late   |
+| C1 | ResNet18        | Yes            | All             | None                                            | Gated  |
+| C2 | ResNet18        | Yes            | All             | None                                            | Late   |
 | D1 | ViT             | Yes            | All             | None                                            | Early  |
 | D2 | ConvNeXt-Tiny   | Yes            | All             | None                                            | Early  |
 | D3 | EfficientNet-B0 | Yes            | All             | None                                            | Early  |
