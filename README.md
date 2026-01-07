@@ -83,6 +83,11 @@ Early fusion with all SWECO variables (merged and de-duplicated):
 python train.py --mode fusion --group all --backbone resnet18
 ```
 
+Early fusion with a SWECO group combination (example: bioclim + vege):
+```
+python train.py --mode fusion --group "bioclim, vege" --backbone resnet18
+```
+
 Switch backbone to ViT:
 ```
 python train.py --mode image --backbone vit
@@ -103,3 +108,44 @@ Notes:
 - swissIMAGE orthophotos: https://www.swisstopo.admin.ch/en/orthoimage-swissimage-10
 - SWECO25 database: Kuelling et al., 2024. SWECO25: a cross-thematic raster database for ecological research in Switzerland.
 - EUNIS Habitat Classification: Chytry et al., 2020.
+
+
+## Ablation Study
+
+ResNet18T denotes a ResNet18 backbone initialized with ImageNet pretrained weights.
+
+**Default Training Configuration**
+
+Unless otherwise specified, all experiments are conducted under the following default settings:
+
+- Maximum epochs: 100
+- Minimum epochs: 30
+- Batch size: 32
+- Learning rate: 1e-4
+- Weight decay: 1e-4
+- Scheduler: ReduceLROnPlateau (patience = 5), monitored on validation macro-F1 score
+- Loss function: Cross-Entropy Loss with class weights
+- Early stopping: triggered after 10 consecutive epochs without improvement in validation loss
+- Fusion mode: Early fusion
+
+| ID | Image Backbone  | Image Features | SWECO Features  | Strategy                                        | Fusion |
+| -- | --------------- | -------------- | --------------- | ----------------------------------------------- | ------ |
+| A0 | ResNet18        | Yes            | None            | None                                            | No     |
+| A1 | ResNet18        | Yes            | All             | None                                            | Early  |
+| A2 | ResNet18        | Yes            | geol            | None                                            | Early  |
+| A3 | ResNet18        | Yes            | edaph           | None                                            | Early  |
+| A4 | ResNet18        | Yes            | vege            | None                                            | Early  |
+| A5 | ResNet18        | Yes            | bioclim         | None                                            | Early  |
+| A6 | ResNet18        | Yes            | lulc_grasslands | None                                            | Early  |
+| A7 | ResNet18        | Yes            | lulc_all        | None                                            | Early  |
+| A8 | ResNet18        | Yes            | hydro           | None                                            | Early  |
+| A9 | ResNet18        | Yes            | population      | None                                            | Early  |
+| B1 | ResNet18        | No             | All             | None                                            | No     |
+| C1 | ResNet18        | Yes            | All             | None                                            | Late   |
+| D1 | ViT             | Yes            | All             | None                                            | Early  |
+| D2 | ConvNeXt-Tiny   | Yes            | All             | None                                            | Early  |
+| D3 | EfficientNet-B0 | Yes            | All             | None                                            | Early  |
+| E1 | ResNet18        | Yes            | All             | Stage-wise Fine-tuning (Progressive Unfreezing) | Early  |
+| F1 | ResNet18        | Yes            | All             | Adjust hyperparameters                          | Early  |
+| G1 | ResNet18        | Yes            | All             | Two-stage classification model                  | Early  |
+

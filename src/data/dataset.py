@@ -8,6 +8,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 import torch.nn.functional as F
+import random
 
 import rasterio
 from rasterio.errors import RasterioIOError
@@ -37,10 +38,48 @@ def _resize_image(img: torch.Tensor, size: tuple[int, int]) -> torch.Tensor:
 
 
 def _maybe_augment(img: torch.Tensor) -> torch.Tensor:
-    if torch.rand(1).item() < 0.5:
-        img = torch.flip(img, dims=[2])
-    if torch.rand(1).item() < 0.5:
-        img = torch.flip(img, dims=[1])
+    """
+    img: Tensor [C, H, W], assumed H=W=200
+    """
+    C, H, W = img.shape
+
+    # -------- 1. Scale jitter: random resized crop --------
+    if random.random() < 0.5:
+        scale = random.uniform(0.7, 1.0)  # crop
+        new_h = int(H * scale)
+        new_w = int(W * scale)
+
+        top = random.randint(0, H - new_h)
+        left = random.randint(0, W - new_w)
+
+        img = img[:, top:top + new_h, left:left + new_w]
+        img = F.interpolate(
+            img.unsqueeze(0),
+            size=(H, W),
+            mode="bilinear",
+            align_corners=False,
+        ).squeeze(0)
+
+    # ----------- 2. Flip ------------
+    if random.random() < 0.5:
+        img = torch.flip(img, dims=[2])  # horizontal
+    if random.random() < 0.5:
+        img = torch.flip(img, dims=[1])  # vertical
+
+    # -------- 3. Brightness / contrast jitter (slight) --------
+    if random.random() < 0.3:
+        brightness = random.uniform(0.9, 1.1)
+        contrast = random.uniform(0.9, 1.1)
+
+        mean = img.mean(dim=(1, 2), keepdim=True)
+        img = (img - mean) * contrast + mean
+        img = img * brightness
+
+    # -------- 4. Small Gaussian noise --------
+    if random.random() < 0.2:
+        noise = torch.randn_like(img) * 0.02
+        img = img + noise
+
     return img
 
 

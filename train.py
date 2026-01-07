@@ -13,36 +13,14 @@ from config import IMAGE_SIZE, NUM_CLASSES, OUTPUT_DIR
 from eunis_labels import eunis_id_to_lab
 from src.data.dataloaders import build_dataloaders
 from src.models.fusion import TabularOnlyModel, ImageOnlyModel, EarlyFusionModel, GatedFusionModel, LateFusionModel
-from src.train.engine import train_one_epoch, evaluate
+from src.train.engine import train_one_epoch, evaluate, run_one_epoch
+from src.train.state_control import TrainingState
 from src.utils.seed import set_seed
 from src.utils.visualize import save_confusion_matrix, save_normalized_confusion_matrix
 from src.utils.plot import plot_all
+from args import parse_args
 
-# ----------------------------- Argument parser -----------------------------
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["tabular", "image", "fusion"], default="image")
-    parser.add_argument(
-        "--group",
-        default=None,
-        help="SWECO group name, required for fusion.",
-    )
-    parser.add_argument("--backbone", choices=["resnet18", "efficientnet_b0", "vit"], default="resnet18")
-    parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--epochs", type=int, default=50)
-    # the default training epoch is set to 10 for quick testing
-    parser.add_argument("--lr", type=float, default=1e-4)
-    parser.add_argument("--weight_decay", type=float, default=1e-4, help="L2 regularization")
-    parser.add_argument("--num_workers", type=int, default=4)
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--pretrained", action="store_true")
-    parser.add_argument("--run_name", default=None)
-    parser.add_argument("--image_size", type=int, default=IMAGE_SIZE[0])
-    parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume.")
-    
-    return parser.parse_args()
 
-# ----------------------------- Main -----------------------------
 def main() -> None:
     args = parse_args()
     set_seed(args.seed)
@@ -50,8 +28,9 @@ def main() -> None:
     if args.mode == "fusion" and not args.group:
         raise ValueError("Fusion mode requires --group (e.g., --group bioclim).")
         
-    # ----------------------------- Load Data -----------------------------
+    # ----------------------------- Data -----------------------------
     image_size = (args.image_size, args.image_size)
+    
     train_loader, val_loader, test_loader, group_cols, weights = build_dataloaders(
         mode=args.mode,
         group=args.group,
@@ -60,17 +39,24 @@ def main() -> None:
         image_size=image_size,
     )
 
+    
+    loaders = {
+        "train": train_loader,
+        "val": val_loader,
+        "test": test_loader,
+    }
+    
+    # ------------------------- Model -------------------------
     if args.mode == "tabular":
         tabular_dim = len(group_cols)  
         model = TabularOnlyModel(tabular_dim=tabular_dim)
     elif args.mode == "image":
         model = ImageOnlyModel(args.backbone, args.pretrained, image_size=image_size)
     else:
-        tabular_dim = len(group_cols)
         model = EarlyFusionModel(
             args.backbone,
             args.pretrained,
-            tabular_dim=tabular_dim,
+            tabular_dim=len(group_cols),
             image_size=image_size,
         )
         # model = GatedFusionModel(
@@ -88,27 +74,22 @@ def main() -> None:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
+    
     if device.type == "cuda":
         try:
-            result = subprocess.run(
-                ["nvidia-smi"],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            if result.stdout:
-                print(result.stdout.strip())
-            if result.stderr:
-                print(result.stderr.strip())
+            subprocess.run(["nvidia-smi"], check=False)
         except FileNotFoundError:
-            print(
-                f"[info] CUDA available but nvidia-smi not found. "
-                f"Using GPU: {torch.cuda.get_device_name(0)}"
-            )
+            print(f"[info] Using GPU: {torch.cuda.get_device_name(0)}")
     else:
-        print("[info] CUDA not available; using CPU.")
+        print("[info] Using CPU")
+    '''
+    # --------------------- if Freeze encoder  ---------------------
+    for p in model.encoder.parameters():
+        p.requires_grad = False
+    print("[info] Stage 1: encoder frozen, training head only")
+    '''
 
-    # ------------------------- Loss / Optimizer / Scheduler -------------------------
+    # --------------- Loss / Optimizer / Scheduler --------------
     class_weights = torch.FloatTensor(weights).to(device)
     criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
 
@@ -125,6 +106,17 @@ def main() -> None:
     #     {'params': backbone_params, 'lr': 1e-5}, 
     #     {'params': other_params, 'lr': args.lr}     
     # ],  weight_decay=args.weight_decay)
+    
+    ''' 
+    # optimizer for freeze-unfreeze training
+    optimizer = torch.optim.AdamW(
+        [
+            {"params": model.encoder.parameters(), "lr": args.encoder_lr},
+            {"params": model.head.parameters(), "lr": args.head_lr},
+        ],
+        weight_decay=args.weight_decay,
+    )
+    '''
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, 
@@ -132,253 +124,215 @@ def main() -> None:
         factor=0.1,       
         patience=5
     )
-    
-    # ------------------------- Training state -------------------------
-    # params for best model and early stopping
-    best_val_f1 = -1.0
-    best_val_loss = float("inf")
-    patience = 10
-    min_delta = 1e-4
-    no_improve_epochs = 0
-    min_epochs = 20 
+
+
+
+    # ---------------------- State ----------------------
+    state = TrainingState(args.patience, args.min_delta)
+
+    history = {
+        "train_loss": [],
+        "train_acc": [],
+        "val_loss": [],
+        "val_acc": [],
+        "val_macro_f1": [],
+    }
+    # ---------------------- Resume ----------------------
     start_epoch = 1
-    
-    # ------------------------- Resume -------------------------
-    if args.resume:
+
+    if args.resume is not None:
         resume_path = Path(args.resume)
-        ckpt_dir = resume_path.parent
-        run_dir = ckpt_dir.parent
-        
         ckpt = torch.load(resume_path, map_location=device)
+    
         model.load_state_dict(ckpt["model"])
         optimizer.load_state_dict(ckpt["optimizer"])
-        scheduler.load_state_dict(ckpt["scheduler"])
+    
+        # restore training state
+        state.best_val_f1 = ckpt["training_state"]["best_val_f1"]
+        state.best_val_loss = ckpt["training_state"]["best_val_loss"]
+        state.no_improve_epochs = ckpt["training_state"]["no_improve_epochs"]
     
         start_epoch = ckpt["epoch"] + 1
-        best_val_loss = ckpt["best_val_loss"]
-        best_val_f1 = ckpt["best_val_f1"]
-        no_improve_epochs = ckpt["no_improve_epochs"]
 
+        ckpt_dir = resume_path.parent
+        run_dir = ckpt_dir.parent
+    
         print(
-            f"[info] Resumed from epoch {ckpt['epoch']} | "
-            f"best_val_loss={best_val_loss:.4f}, best_val_f1={best_val_f1:.4f}"
+            f"[Resume] Loaded from {resume_path}\n"
+            f"         start_epoch={start_epoch}, "
+            f"best_f1={state.best_val_f1:.4f}\n"
+            f"         run_dir={run_dir}"
         )
-        print(f"[info] Continue in run: {run_dir}")
 
     else:
+        # start from 0
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        if args.run_name:
-            run_name = args.run_name
-        elif args.mode == "image":
-            run_name = f"{args.backbone}_image_{timestamp}"
-        else:
-            run_name = f"{args.backbone}_fusion_{args.group}_{timestamp}"
-    
+        run_name = args.run_name or f"{args.backbone}_{args.mode}_{timestamp}"
         run_dir = Path(OUTPUT_DIR) / run_name
         ckpt_dir = run_dir / "checkpoints"
         ckpt_dir.mkdir(parents=True, exist_ok=True)
         
+    # ---------------------- metrics ----------------------
     metrics_path = run_dir / "metrics.csv"
-    
-    # ------------------------- Metrics -------------------------
     if not metrics_path.exists():
         with metrics_path.open("w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(
-                [
-                    "epoch",
-                    "lr", 
-                    "weight_decay",
-                    "train_loss",
-                    "train_accuracy",
-                    "val_loss",
-                    "val_accuracy",
-                    "val_macro_f1",
-                    "val_micro_f1",
-                    "best_checkpoint",
-                    "last_checkpoint",
-                ]
-            )
-    # ------------------------- History -------------------------
-    train_accs = []
-    train_losses = []
-    val_accs = []
-    val_losses = []
-    val_macro_f1s = []
-    val_micro_f1s = []
+            csv.writer(f).writerow([
+                "epoch",
+                "lr",
+                "train_loss",
+                "train_acc",
+                "val_loss",
+                "val_acc",
+                "val_macro_f1",
+                "val_micro_f1",
+                "best_ckpt",
+                "last_ckpt",
+            ])
 
-    # ------------------------- Training loop -------------------------
+    # ===================================================
+    # Training loop
+    # ===================================================
+    
     for epoch in range(start_epoch, args.epochs + 1):
+        
+        '''
+        # ---- staged unfreeze ----
+        if epoch >= args.freeze_epochs:
+            for name, p in model.encoder.named_parameters():
+                if name.startswith(args.unfreeze_layer):
+                    p.requires_grad = True
+
+        if epoch >= args.encoder_lr_drop_epoch:
+            optimizer.param_groups[0]["lr"] = args.encoder_lr_after
+        ''' 
+        # run one epoch (train and val)
+        metrics = run_one_epoch(
+            model,
+            loaders,
+            NUM_CLASSES,
+            optimizer,
+            criterion,
+            device,
+            args.mode,
+            epoch,
+            scheduler,
+        )
+        
+        print(
+            f"Epoch {epoch:03d} | "
+            f"train_acc={metrics['train_acc']:.4f} | "
+            f"train_loss={metrics['train_loss']:.4f} | "
+            f"val_acc={metrics['val_acc']:.4f} | "
+            f"val_loss={metrics['val_loss']:.4f} | "
+            f"val_macro_f1={metrics['val_macro_f1']:.4f}"
+        )
+        
+        # record state
+        improved = state.update(
+            metrics["val_loss"], metrics["val_macro_f1"]
+        )
+
         best_ckpt_path = ""
         last_ckpt_path = ""
         
-        # 1. train
-        train_loss, train_acc = train_one_epoch(model, train_loader, optimizer, criterion, device, mode=args.mode)
-        # 2. val
-        val_metrics, val_loss, _, _, _ = evaluate(
-            model, val_loader, criterion, device, mode=args.mode, num_classes=NUM_CLASSES
-        )
-
-        scheduler.step(val_metrics["macro_f1"])
-
-        # print result of current epoch
-        print(
-            f"Epoch {epoch}/{args.epochs} | "
-            f"train_loss={train_loss:.4f} | train_acc={train_acc:.4f} | "
-            f"val_loss={val_loss:.4f} | val_acc={val_metrics['accuracy']:.4f} | "
-            f"val_macro_f1={val_metrics['macro_f1']:.4f}"
-        )
-
-        if hasattr(model, 'fusion_weight'):
-            with torch.no_grad():
-                alpha_val = torch.sigmoid(model.fusion_weight).item()
-                
-            print(f"--- [Alpha Monitor] Epoch {epoch}: {alpha_val:.4f} "
-                f"(Image Weight: {alpha_val:.2%} | Tabular Weight: {1-alpha_val:.2%}) ---")
-        
-        # 3. best model (F1)
-        val_macro_f1 = val_metrics["macro_f1"]
-
-        if val_loss < best_val_loss - min_delta:
-            best_val_loss = val_loss
-
-        if val_macro_f1 > best_val_f1:
-            best_val_f1 = val_macro_f1
-            best_ckpt_path = str(ckpt_dir / "best.pt")
+        # update best model
+        if improved:
+            best_ckpt_path = ckpt_dir / "best.pt"
             torch.save(
                 {
                     "epoch": epoch,
                     "model": model.state_dict(),
                     "optimizer": optimizer.state_dict(),
-                    "scheduler": scheduler.state_dict(),
-                    "best_val_loss": best_val_loss,
-                    "best_val_f1": best_val_f1,
-                    "no_improve_epochs": no_improve_epochs,
+                    "training_state": {
+                        "best_val_f1": state.best_val_f1,
+                        "best_val_loss": state.best_val_loss,
+                        "no_improve_epochs": state.no_improve_epochs,
+                    },
                 },
                 best_ckpt_path,
             )
-            print(f"[Best Model] Saved successfully: {best_ckpt_path}")
-            no_improve_epochs = 0
-        else:
-            no_improve_epochs += 1
-
-        # 4. last checkpoint
-        # save checkpoint every 5 epochs 
-        ckpt_interval = 5 
-        if epoch % ckpt_interval == 0:
+            print("[Best] checkpoint saved")
+            
+        # save checkpoint every 5 epochs    
+        if epoch % 5 == 0:
             last_ckpt_path = ckpt_dir / f"last_{epoch:03d}.pt"
             torch.save(
                 {
                     "epoch": epoch,
                     "model": model.state_dict(),
                     "optimizer": optimizer.state_dict(),
-                    "scheduler": scheduler.state_dict(),
-                    "best_val_loss": best_val_loss,
-                    "best_val_f1": best_val_f1,
-                    "no_improve_epochs": no_improve_epochs,
+                    "training_state": {
+                        "best_val_f1": state.best_val_f1,
+                        "best_val_loss": state.best_val_loss,
+                        "no_improve_epochs": state.no_improve_epochs,
+                    },
                 },
                 last_ckpt_path,
             )
-            print(f"[Checkpoint] Saved successfully: {last_ckpt_path}")
 
-        # 5. save into CSV 
-        
-        # add into history   
-        train_losses.append(train_loss)
-        train_accs.append(train_acc)
-        val_losses.append(val_loss)
-        val_accs.append(val_metrics["accuracy"])
-        val_macro_f1s.append(val_metrics["macro_f1"])
-        val_micro_f1s.append(val_metrics["micro_f1"])
+        # record history
+        for k in history:
+            history[k].append(metrics[k])
 
         with metrics_path.open("a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(
-                [
-                    epoch,
-                    optimizer.param_groups[0]['lr'],
-                    args.weight_decay,
-                    f"{train_loss:.6f}",
-                    f"{train_acc:.6f}",
-                    f"{val_loss:.6f}",
-                    f"{val_metrics['accuracy']:.6f}",
-                    f"{val_metrics['macro_f1']:.6f}",
-                    f"{val_metrics['micro_f1']:.6f}",
-                    best_ckpt_path,
-                    last_ckpt_path,
-                ]
-            )
-
-        # 6. execute early stopping
-        if no_improve_epochs >= patience and epoch >= min_epochs:
-            # final safety save
-            last_ckpt_path = ckpt_dir / f"last_{epoch:03d}.pt"
-            torch.save(
-                {
-                    "epoch": epoch,
-                    "model": model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                    "scheduler": scheduler.state_dict(),
-                    "best_val_loss": best_val_loss,
-                    "best_val_f1": best_val_f1,
-                    "no_improve_epochs": no_improve_epochs,
-                },
+            csv.writer(f).writerow([
+                epoch,
+                metrics["lr"],
+                metrics["train_loss"],
+                metrics["train_acc"],
+                metrics["val_loss"],
+                metrics["val_acc"],
+                metrics["val_macro_f1"],
+                metrics["val_micro_f1"],
+                best_ckpt_path,
                 last_ckpt_path,
-            )
-            print(f"[Checkpoint] Saved successfully: {last_ckpt_path}")
-            print(
-                f"[info] Early stopping triggered at epoch {epoch}. "
-                f"Best val loss: {best_val_loss:.4f}, "
-                f"Best val macro-F1: {best_val_f1:.4f}"
-            )
+            ])
+
+        if (
+            state.no_improve_epochs >= args.patience
+            and epoch >= args.min_epochs
+        ):
+            print("[info] Early stopping triggered")
             break
-                  
-            
-    # load best model to test
+
+    # ===================================================
+    # Test best model
+    # ===================================================
     best_path = ckpt_dir / "best.pt"
-    if not best_path.exists():
-        raise FileNotFoundError(f"best.pt not found in {ckpt_dir}")
     ckpt = torch.load(best_path, map_location=device)
     model.load_state_dict(ckpt["model"])
+
     test_metrics, _, y_true, y_pred, per_class = evaluate(
-        model, test_loader, criterion, device, mode=args.mode, num_classes=NUM_CLASSES
+        model,
+        loaders["test"],
+        criterion,
+        device,
+        mode=args.mode,
+        num_classes=NUM_CLASSES,
     )
 
     print(
         f"Test | acc={test_metrics['accuracy']:.4f} | "
-        f"macro_f1={test_metrics['macro_f1']:.4f} | micro_f1={test_metrics['micro_f1']:.4f}"
+        f"macro_f1={test_metrics['macro_f1']:.4f}"
     )
 
     labels = [eunis_id_to_lab[i] for i in range(NUM_CLASSES)]
-    save_confusion_matrix(
-        y_true,
-        y_pred,
-        labels=labels,
-        output_dir=str(run_dir),
-        filename_prefix="confusion_matrix",
-    )
-    save_normalized_confusion_matrix(
-        y_true,
-        y_pred,
-        labels=labels,
-        output_dir=str(run_dir),
-        filename_prefix="confusion_matrix_normalized",
-    )
+    save_confusion_matrix(y_true, y_pred, labels, run_dir)
+    save_normalized_confusion_matrix(y_true, y_pred, labels, run_dir)
 
-    per_class_df = pd.DataFrame(
-        {"class_id": list(range(NUM_CLASSES)), "class_name": labels, "f1": per_class.numpy()}
-    )
-    per_class_df.to_csv(run_dir / "per_class_f1.csv", index=False)
+    pd.DataFrame({
+        "class_id": range(NUM_CLASSES),
+        "class_name": labels,
+        "f1": per_class.numpy(),
+    }).to_csv(run_dir / "per_class_f1.csv", index=False)
 
-    # plot accuracy/loss/f1 score in one figure
-    epochs = list(range(1, len(train_losses) + 1))  
     plot_all(
-        epochs,
-        train_losses,
-        val_losses,
-        train_accs,
-        val_accs,
-        val_macro_f1s,
+        list(range(1, len(history["train_loss"]) + 1)),
+        history["train_loss"],
+        history["val_loss"],
+        history["train_acc"],
+        history["val_acc"],
+        history["val_macro_f1"],
         run_dir,
     )
 

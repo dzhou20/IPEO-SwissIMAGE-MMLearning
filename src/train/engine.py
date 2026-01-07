@@ -7,7 +7,6 @@ from torch.utils.data import DataLoader
 
 from src.utils.metrics import classification_metrics, per_class_f1
 
-
 def train_one_epoch(
     model: torch.nn.Module,
     loader: DataLoader,
@@ -133,3 +132,52 @@ def evaluate(
         torch.from_numpy(y_pred),
         torch.from_numpy(per_class),
     )
+
+# ============================================================
+# One epoch runner
+# ============================================================
+def run_one_epoch(
+    model,
+    loaders,
+    num_classes,
+    optimizer,
+    criterion,
+    device,
+    mode,
+    epoch,
+    scheduler=None,
+):
+    train_loss, train_acc = train_one_epoch(
+        model,
+        loaders["train"],
+        optimizer,
+        criterion,
+        device,
+        mode=mode,
+    )
+
+    val_metrics, val_loss, y_true, y_pred, per_class = evaluate(
+        model,
+        loaders["val"],
+        criterion,
+        device,
+        mode=mode,
+        num_classes=num_classes,
+    )
+
+    if scheduler is not None:
+        scheduler.step(val_metrics["macro_f1"])
+
+    return {
+        "train_loss": train_loss,
+        "train_acc": train_acc,
+        "val_loss": val_loss,
+        "val_acc": val_metrics["accuracy"],
+        "val_macro_f1": val_metrics["macro_f1"],
+        "val_micro_f1": val_metrics["micro_f1"],
+        "per_class_f1": per_class,
+        "y_true": y_true,
+        "y_pred": y_pred,
+        "lr": optimizer.param_groups[0]["lr"],
+    }
+
