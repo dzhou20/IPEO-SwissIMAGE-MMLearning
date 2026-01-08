@@ -156,5 +156,7 @@ Unless otherwise specified, all experiments are conducted under the following de
 | F1 | ResNet18        | Yes            | All             | Stage-wise Fine-tuning (Progressive Unfreezing) | Early  |
 | G1 | ResNet18        | Yes            | All             | lr = 1e-5                                       | Early  |
 | G2 | ResNet18        | Yes            | All             | lr = 1e-3                                       | Early  |
+| G3 | ResNet18        | Yes            | All             | lr = 5e-4                                       | Early  |
+| G4 | ResNet18        | Yes            | All             | weight_decay = 1e-2                             | Early  |
 | H1 | ResNet18        | Yes            | All             | Two-stage classification model                  | Early  |
 
