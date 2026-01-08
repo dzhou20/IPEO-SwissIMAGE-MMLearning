@@ -1,0 +1,18 @@
+class_id,class_name,f1
+0,Surface standing waters,0.8662207357859532
+1,Surface running waters,0.8431372549019608
+2,Dry grasslands,0.5515151515151515
+3,Mesic grasslands,0.4249201277955272
+4,Seasonally wet and wet grasslands,0.3833634719710669
+5,Alpine and subalpine grasslands,0.5919003115264797
+6,"Arctic, alpine and subalpine scrub",0.5278810408921933
+7,Shrub plantations,0.8449367088607594
+8,Broadleaved deciduous woodland,0.5403726708074534
+9,Coniferous woodland,0.6377295492487479
+10,Mixed deciduous and coniferous woodland,0.3971631205673759
+11,"Inland cliffs, rock pavements and outcrops",0.7266666666666667
+12,Arable land and market gardens,0.588034188034188
+13,Cultivated areas of gardens and parks,0.6526315789473685
+14,"Buildings of cities, towns and villages",0.6415711947626841
+15,Low density buildings,0.4773109243697479
+16,Transport networks and other constructed hard-surfaced areas,0.8056042031523643
