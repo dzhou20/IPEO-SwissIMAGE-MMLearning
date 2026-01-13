@@ -1,0 +1,2 @@
+mode,group,backbone,accuracy,macro_f1
+fusion,edaph,resnet18,0.5629411764705883,0.5629453473823671
