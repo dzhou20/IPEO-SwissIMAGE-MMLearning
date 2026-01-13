@@ -1,0 +1,2 @@
+mode,group,backbone,accuracy,macro_f1
+fusion,hydro,resnet18,0.5292156862745098,0.5363944246914505

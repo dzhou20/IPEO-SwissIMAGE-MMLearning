@@ -1,0 +1,2 @@
+mode,group,backbone,accuracy,macro_f1
+fusion,lulc_grasslands,resnet18,0.5519607843137255,0.5521534172059768

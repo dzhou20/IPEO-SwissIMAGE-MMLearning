@@ -1,0 +1,2 @@
+mode,group,backbone,accuracy,macro_f1
+fusion,bioclim,resnet18,0.5535294117647059,0.5464702029301498

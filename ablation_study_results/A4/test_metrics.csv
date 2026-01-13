@@ -1,0 +1,2 @@
+mode,group,backbone,accuracy,macro_f1
+fusion,vege,resnet18,0.5384313725490196,0.5396481239925347

@@ -1,0 +1,6 @@
+run_name,mode,group,backbone,accuracy,macro_f1
+A4,fusion,vege,resnet18,0.538431,0.539648
+A5,fusion,bioclim,resnet18,0.553529,0.546470
+A6,fusion,lulc_grasslands,resnet18,0.551961,0.552153
+A8,fusion,hydro,resnet18,0.529216,0.536394
+A9,fusion,population,resnet18,0.545294,0.545044
