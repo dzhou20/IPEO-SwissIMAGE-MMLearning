@@ -1,2 +1,2 @@
 mode,group,backbone,accuracy,macro_f1
-image,lulc_all,resnet18,0.5247058823529411,0.5244553985792514
+image,,resnet18,0.5247058823529411,0.5244553985792514

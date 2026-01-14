@@ -1,11 +1,12 @@
 run_name,mode,group,backbone,accuracy,macro_f1
 A4,fusion,vege,resnet18,0.538431,0.539648
-A5,fusion,bioclim,resnet18,0.553529,0.546470
+A5,fusion,bioclim,resnet18,0.553529,0.54647
 A6,fusion,lulc_grasslands,resnet18,0.551961,0.552153
 A8,fusion,hydro,resnet18,0.529216,0.536394
 A9,fusion,population,resnet18,0.545294,0.545044
-A1,fusion,all,resnet18,0.580000,0.583379
+A1,fusion,all,resnet18,0.58,0.583379
 A2,fusion,geol,resnet18,0.527255,0.521378
 A3,fusion,edaph,resnet18,0.562941,0.562945
-A7,fusion,lulc_all,resnet18,0.560980,0.561229
-A0,image,lulc_all,resnet18,0.524706,0.524455
+A7,fusion,lulc_all,resnet18,0.56098,0.561229
+A0,image,,resnet18,0.524706,0.524455
+F1,fusion,all,resnet18,0.587647,0.580669

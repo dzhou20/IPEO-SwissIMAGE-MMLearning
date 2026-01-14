@@ -149,9 +149,8 @@ Unless otherwise specified, all experiments are conducted under the following de
 | B1 | ResNet18        | No             | All             | None                                            | No     |
 | C1 | ResNet18        | Yes            | All             | None                                            | Gated  |
 | C2 | ResNet18        | Yes            | All             | None                                            | Late   |
-| D1 | ViT             | Yes            | All             | None                                            | Early  |
-| D2 | ConvNeXt-Tiny   | Yes            | All             | None                                            | Early  |
-| D3 | EfficientNet-B0 | Yes            | All             | None                                            | Early  |
+| D1 | ConvNeXt-Tiny   | Yes            | All             | None                                            | Early  |
+| D2 | EfficientNet-B0 | Yes            | All             | None                                            | Early  |
 | E1 | ResNet18        | Yes            | All             | Pretrained = False                              | Early  |
 | F1 | ResNet18        | Yes            | All             | Stage-wise Fine-tuning (Progressive Unfreezing) | Early  |
 | G1 | ResNet18        | Yes            | All             | lr = 1e-5                                       | Early  |
