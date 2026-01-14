@@ -25,14 +25,15 @@ from args import parse_args
 
 
 def main() -> None:
-    test_ckpt = "ablation_study_results/A7/checkpoints/best.pt"
+    test_ckpt = "ablation_study_results/D1/checkpoints/best.pt"
     
     # ===================================================
     # Args & seed
     # ===================================================
     args = parse_args()
+    args.backbone = 'convnext_tiny'
     args.mode = "fusion"
-    args.group = "lulc_all"
+    args.group = "all"
     
     set_seed(args.seed)
 

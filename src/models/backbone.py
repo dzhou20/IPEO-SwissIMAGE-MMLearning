@@ -41,4 +41,4 @@ def build_backbone(
         )
         return model, model.num_features
 
-    raise ValueError("Unsupported backbone. Use 'resnet18', convnext_tiny' or 'efficientnet_b0'.")
+    raise ValueError("Unsupported backbone. Use 'resnet18', 'convnext_tiny' or 'efficientnet_b0'.")
