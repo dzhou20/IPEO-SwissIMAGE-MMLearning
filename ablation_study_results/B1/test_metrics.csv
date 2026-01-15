@@ -1,0 +1,2 @@
+mode,group,backbone,accuracy,macro_f1
+tabular,all,resnet18,0.5688235294117647,0.5600741161026008

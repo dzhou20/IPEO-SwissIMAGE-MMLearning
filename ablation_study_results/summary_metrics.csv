@@ -12,3 +12,12 @@ A0,image,,resnet18,0.524706,0.524455
 F1,fusion,all,resnet18,0.587647,0.580669
 D1,fusion,all,convnext_tiny,0.575294,0.567488
 D2,fusion,all,efficientnet_b0,0.571765,0.572139
+B1,tabular,all,resnet18,0.568824,0.560074
+C1,fusion,all,resnet18,0.586471,0.586084
+C2,fusion,all,resnet18,0.580784,0.573792
+E1,fusion,all,resnet18,0.584902,0.583417
+G1,fusion,all,resnet18,0.571961,0.572144
+G2,fusion,all,resnet18,0.602941,0.597368
+G3,fusion,all,resnet18,0.619216,0.617703
+G4,fusion,all,resnet18,0.580980,0.581922
+G5,fusion,all,resnet18,0.623137,0.622388

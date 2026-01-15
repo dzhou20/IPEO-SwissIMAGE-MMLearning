@@ -25,13 +25,13 @@ from args import parse_args
 
 
 def main() -> None:
-    test_ckpt = "ablation_study_results/D1/checkpoints/best.pt"
+    test_ckpt = "ablation_study_results/G5/checkpoints/best.pt"
     
     # ===================================================
     # Args & seed
     # ===================================================
     args = parse_args()
-    args.backbone = 'convnext_tiny'
+    args.backbone = 'resnet18'
     args.mode = "fusion"
     args.group = "all"
     
@@ -73,13 +73,24 @@ def main() -> None:
             image_size=image_size,
         )
     else:
-        model = EarlyFusionModel(
-            args.backbone,
-            args.pretrained,
-            tabular_dim=len(group_cols),
-            image_size=image_size,
+        # model = EarlyFusionModel(
+        #     args.backbone,
+        #     args.pretrained,
+        #     tabular_dim=len(group_cols),
+        #     image_size=image_size,
+        # )
+        model = GatedFusionModel(
+            backbone=args.backbone,
+            pretrained=args.pretrained,
+            tabular_dim=len(group_cols), 
+            image_size=image_size
         )
-        # 如果你 test gated / late，只需要在这里换
+        # model = LateFusionModel(
+        #     args.backbone,
+        #     args.pretrained,
+        #     tabular_dim=len(group_cols),
+        #     image_size=image_size,
+        # )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
