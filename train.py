@@ -59,10 +59,10 @@ def main() -> None:
             image_size=image_size,
         )
         # model = GatedFusionModel(
-        #     backbone=args.backbone,
-        #     pretrained=args.pretrained,
+        #     args.backbone,
+        #     args.pretrained,
         #     tabular_dim=len(group_cols), 
-        #     image_size=image_size
+        #     image_size=image_size,
         # )
         # model = LateFusionModel(
         #     args.backbone,

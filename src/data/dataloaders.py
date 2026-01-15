@@ -21,7 +21,6 @@ def _resolve_group_columns(df: pd.DataFrame, group: Optional[str]) -> Optional[l
     seen = set() 
 
     if group == "all":
-
         group_keys = list(sweco_variables_dict.keys())
     else:
         group_keys = [g.strip() for g in group.split(',')]
