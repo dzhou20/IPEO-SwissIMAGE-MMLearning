@@ -81,12 +81,6 @@ def main() -> None:
             print(f"[info] Using GPU: {torch.cuda.get_device_name(0)}")
     else:
         print("[info] Using CPU")
-    '''
-    # --------------------- if Freeze encoder  ---------------------
-    for p in model.encoder.parameters():
-        p.requires_grad = False
-    print("[info] Stage 1: encoder frozen, training head only")
-    '''
 
     # --------------- Loss / Optimizer / Scheduler --------------
     class_weights = torch.FloatTensor(weights).to(device)
@@ -100,22 +94,13 @@ def main() -> None:
             backbone_params.append(param)
         else:
             other_params.append(param)
+            
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    
     # optimizer = torch.optim.AdamW([
     #     {'params': backbone_params, 'lr': 1e-5}, 
     #     {'params': other_params, 'lr': args.lr}     
-    # ],  weight_decay=args.weight_decay)
-    
-    ''' 
-    # optimizer for freeze-unfreeze training
-    optimizer = torch.optim.AdamW(
-        [
-            {"params": model.encoder.parameters(), "lr": args.encoder_lr},
-            {"params": model.head.parameters(), "lr": args.head_lr},
-        ],
-        weight_decay=args.weight_decay,
-    )
-    '''
+    # ],  weight_decay=args.weight_decay)    
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, 
@@ -123,7 +108,6 @@ def main() -> None:
         factor=0.1,       
         patience=5
     )
-
 
     # ---------------------- State ----------------------
     state = TrainingState(args.patience, args.min_delta)
@@ -144,7 +128,9 @@ def main() -> None:
     
         model.load_state_dict(ckpt["model"])
         optimizer.load_state_dict(ckpt["optimizer"])
-        scheduler.load_state_dict(ckpt["scheduler"])
+        
+        if scheduler is not None and ckpt.get("scheduler") is not None:
+            scheduler.load_state_dict(ckpt["scheduler"])
     
         # restore training state
         state.best_val_f1 = ckpt["training_state"]["best_val_f1"]
@@ -194,16 +180,6 @@ def main() -> None:
     
     for epoch in range(start_epoch, args.epochs + 1):
         
-        '''
-        # ---- staged unfreeze ----
-        if epoch >= args.freeze_epochs:
-            for name, p in model.encoder.named_parameters():
-                if name.startswith(args.unfreeze_layer):
-                    p.requires_grad = True
-
-        if epoch >= args.encoder_lr_drop_epoch:
-            optimizer.param_groups[0]["lr"] = args.encoder_lr_after
-        ''' 
         # run one epoch (train and val)
         metrics = run_one_epoch(
             model,
@@ -242,7 +218,7 @@ def main() -> None:
                     "epoch": epoch,
                     "model": model.state_dict(),
                     "optimizer": optimizer.state_dict(),
-                    "scheduler": scheduler.state_dict(),
+                    "scheduler": scheduler.state_dict() if scheduler is not None else None,
                     "training_state": {
                         "best_val_f1": state.best_val_f1,
                         "best_val_loss": state.best_val_loss,
@@ -261,7 +237,7 @@ def main() -> None:
                     "epoch": epoch,
                     "model": model.state_dict(),
                     "optimizer": optimizer.state_dict(),
-                    "scheduler": scheduler.state_dict(),
+                    "scheduler": scheduler.state_dict()  if scheduler is not None else None,
                     "training_state": {
                         "best_val_f1": state.best_val_f1,
                         "best_val_loss": state.best_val_loss,

@@ -1,0 +1,2 @@
+mode,group,backbone,accuracy,macro_f1
+fusion,all,convnext_tiny,0.5752941176470588,0.567488386087984

@@ -1,0 +1,2 @@
+mode,group,backbone,accuracy,macro_f1
+fusion,all,efficientnet_b0,0.571764705882353,0.5721391088340889

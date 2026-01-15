@@ -152,11 +152,9 @@ Unless otherwise specified, all experiments are conducted under the following de
 | D1 | ConvNeXt-Tiny   | Yes            | All             | None                                            | Early  |
 | D2 | EfficientNet-B0 | Yes            | All             | None                                            | Early  |
 | E1 | ResNet18        | Yes            | All             | Pretrained = False                              | Early  |
-| F1 | ResNet18        | Yes            | All             | Stage-wise Fine-tuning (Progressive Unfreezing) | Early  |
 | G1 | ResNet18        | Yes            | All             | lr = 1e-5                                       | Early  |
 | G2 | ResNet18        | Yes            | All             | lr = 1e-3                                       | Early  |
 | G3 | ResNet18        | Yes            | All             | lr = 5e-4                                       | Early  |
 | G4 | ResNet18        | Yes            | All             | weight_decay = 1e-2                             | Early  |
 | G5 | ResNet18        | Yes            | All             | lr = 5e-4                                       | Gated  |
-| H1 | ResNet18        | Yes            | All             | Two-stage classification model                  | Early  |
 
